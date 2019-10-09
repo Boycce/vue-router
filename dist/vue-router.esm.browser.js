@@ -1,5 +1,5 @@
 /*!
-  * vue-router v3.1.3
+  * vue-router v3.2.0
   * (c) 2019 Evan You
   * @license MIT
   */
@@ -930,7 +930,12 @@ function normalizeLocation (
   if (next._normalized) {
     return next
   } else if (next.name) {
-    return extend({}, raw)
+    next = extend({}, raw);
+    const params = next.params;
+    if (params && typeof params === 'object') {
+      next.params = extend({}, params);
+    }
+    return next
   }
 
   // relative params
@@ -2066,14 +2071,6 @@ class History {
       }
       onAbort && onAbort(err);
     };
-    if (
-      isSameRoute(route, current) &&
-      // in the case the route map has been dynamically appended to
-      route.matched.length === current.matched.length
-    ) {
-      this.ensureURL();
-      return abort(new NavigationDuplicated(route))
-    }
 
     const { updated, deactivated, activated } = resolveQueue(
       this.current.matched,
@@ -2186,15 +2183,18 @@ function resolveQueue (
 ) {
   let i;
   const max = Math.max(current.length, next.length);
+
+  // Get the index of the first non-matching route pair
   for (i = 0; i < max; i++) {
     if (current[i] !== next[i]) {
       break
     }
   }
+
   return {
     updated: next.slice(0, i),
-    activated: next.slice(i),
-    deactivated: current.slice(i)
+    activated: next,
+    deactivated: current
   }
 }
 
@@ -2825,7 +2825,7 @@ function createHref (base, fullPath, mode) {
 }
 
 VueRouter.install = install;
-VueRouter.version = '3.1.3';
+VueRouter.version = '3.2.0';
 
 if (inBrowser && window.Vue) {
   window.Vue.use(VueRouter);
