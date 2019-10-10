@@ -944,20 +944,25 @@ function normalizeLocation (
   if (next._normalized) {
     return next
   } else if (next.name) {
-    return extend({}, raw)
+    next = extend({}, raw);
+    var params = next.params;
+    if (params && typeof params === 'object') {
+      next.params = extend({}, params);
+    }
+    return next
   }
 
   // relative params
   if (!next.path && next.params && current) {
     next = extend({}, next);
     next._normalized = true;
-    var params = extend(extend({}, current.params), next.params);
+    var params$1 = extend(extend({}, current.params), next.params);
     if (current.name) {
       next.name = current.name;
-      next.params = params;
+      next.params = params$1;
     } else if (current.matched.length) {
       var rawPath = current.matched[current.matched.length - 1].path;
-      next.path = fillParams(rawPath, params, ("path " + (current.path)));
+      next.path = fillParams(rawPath, params$1, ("path " + (current.path)));
     } else if (process.env.NODE_ENV !== 'production') {
       warn(false, "relative params navigation requires a current route.");
     }
@@ -2081,14 +2086,6 @@ History.prototype.confirmTransition = function confirmTransition (route, onCompl
     }
     onAbort && onAbort(err);
   };
-  if (
-    isSameRoute(route, current) &&
-    // in the case the route map has been dynamically appended to
-    route.matched.length === current.matched.length
-  ) {
-    this.ensureURL();
-    return abort(new NavigationDuplicated(route))
-  }
 
   var ref = resolveQueue(
     this.current.matched,
@@ -2203,15 +2200,18 @@ function resolveQueue (
 ) {
   var i;
   var max = Math.max(current.length, next.length);
+
+  // Get the index of the first non-matching route pair
   for (i = 0; i < max; i++) {
     if (current[i] !== next[i]) {
       break
     }
   }
+
   return {
     updated: next.slice(0, i),
-    activated: next.slice(i),
-    deactivated: current.slice(i)
+    activated: next,
+    deactivated: current
   }
 }
 
@@ -2363,7 +2363,8 @@ var HTML5History = /*@__PURE__*/(function (History) {
     var ref = this;
     var fromRoute = ref.current;
     this.transitionTo(location, function (route) {
-      pushState(cleanPath(this$1.base + route.fullPath));
+      var fn = fromRoute.fullPath === route.fullPath ? replaceState : pushState;
+      fn(cleanPath(this$1.base + route.fullPath));
       handleScroll(this$1.router, route, fromRoute, false);
       onComplete && onComplete(route);
     }, onAbort);
@@ -2456,15 +2457,12 @@ var HashHistory = /*@__PURE__*/(function (History) {
 
     var ref = this;
     var fromRoute = ref.current;
-    this.transitionTo(
-      location,
-      function (route) {
-        pushHash(route.fullPath);
-        handleScroll(this$1.router, route, fromRoute, false);
-        onComplete && onComplete(route);
-      },
-      onAbort
-    );
+    this.transitionTo(location, function (route) {
+      var fn = fromRoute.fullPath === route.fullPath ? replaceHash : pushHash;
+      fn(route.fullPath);
+      handleScroll(this$1.router, route, fromRoute, false);
+      onComplete && onComplete(route);
+    }, onAbort);
   };
 
   HashHistory.prototype.replace = function replace (location, onComplete, onAbort) {
@@ -2472,15 +2470,11 @@ var HashHistory = /*@__PURE__*/(function (History) {
 
     var ref = this;
     var fromRoute = ref.current;
-    this.transitionTo(
-      location,
-      function (route) {
-        replaceHash(route.fullPath);
-        handleScroll(this$1.router, route, fromRoute, false);
-        onComplete && onComplete(route);
-      },
-      onAbort
-    );
+    this.transitionTo(location, function (route) {
+      replaceHash(route.fullPath);
+      handleScroll(this$1.router, route, fromRoute, false);
+      onComplete && onComplete(route);
+    }, onAbort);
   };
 
   HashHistory.prototype.go = function go (n) {
