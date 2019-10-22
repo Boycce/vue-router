@@ -270,6 +270,7 @@ function createRoute (
   } catch (e) {}
 
   const route = {
+    id: Date.now(),
     name: location.name || (record && record.name),
     meta: (record && record.meta) || {},
     path: location.path || '/',
@@ -930,7 +931,12 @@ function normalizeLocation (
   if (next._normalized) {
     return next
   } else if (next.name) {
-    return extend({}, raw)
+    next = extend({}, raw);
+    const params = next.params;
+    if (params && typeof params === 'object') {
+      next.params = extend({}, params);
+    }
+    return next
   }
 
   // relative params
@@ -2066,14 +2072,6 @@ class History {
       }
       onAbort && onAbort(err);
     };
-    if (
-      isSameRoute(route, current) &&
-      // in the case the route map has been dynamically appended to
-      route.matched.length === current.matched.length
-    ) {
-      this.ensureURL();
-      return abort(new NavigationDuplicated(route))
-    }
 
     const { updated, deactivated, activated } = resolveQueue(
       this.current.matched,
@@ -2186,15 +2184,18 @@ function resolveQueue (
 ) {
   let i;
   const max = Math.max(current.length, next.length);
+
+  // Get the index of the first non-matching route pair
   for (i = 0; i < max; i++) {
     if (current[i] !== next[i]) {
       break
     }
   }
+
   return {
     updated: next.slice(0, i),
-    activated: next.slice(i),
-    deactivated: current.slice(i)
+    activated: next,
+    deactivated: current
   }
 }
 
@@ -2337,7 +2338,8 @@ class HTML5History extends History {
   push (location, onComplete, onAbort) {
     const { current: fromRoute } = this;
     this.transitionTo(location, route => {
-      pushState(cleanPath(this.base + route.fullPath));
+      const fn = fromRoute.fullPath === route.fullPath ? replaceState : pushState;
+      fn(cleanPath(this.base + route.fullPath));
       handleScroll(this.router, route, fromRoute, false);
       onComplete && onComplete(route);
     }, onAbort);
@@ -2416,28 +2418,21 @@ class HashHistory extends History {
 
   push (location, onComplete, onAbort) {
     const { current: fromRoute } = this;
-    this.transitionTo(
-      location,
-      route => {
-        pushHash(route.fullPath);
-        handleScroll(this.router, route, fromRoute, false);
-        onComplete && onComplete(route);
-      },
-      onAbort
-    );
+    this.transitionTo(location, route => {
+      const fn = fromRoute.fullPath === route.fullPath ? replaceHash : pushHash;
+      fn(route.fullPath);
+      handleScroll(this.router, route, fromRoute, false);
+      onComplete && onComplete(route);
+    }, onAbort);
   }
 
   replace (location, onComplete, onAbort) {
     const { current: fromRoute } = this;
-    this.transitionTo(
-      location,
-      route => {
-        replaceHash(route.fullPath);
-        handleScroll(this.router, route, fromRoute, false);
-        onComplete && onComplete(route);
-      },
-      onAbort
-    );
+    this.transitionTo(location, route => {
+      replaceHash(route.fullPath);
+      handleScroll(this.router, route, fromRoute, false);
+      onComplete && onComplete(route);
+    }, onAbort);
   }
 
   go (n) {
